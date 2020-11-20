@@ -1,0 +1,44 @@
+{-# STDLIB_VERSION 4 #-}
+{-# CONTENT_TYPE DAPP #-}
+{-# SCRIPT_TYPE ACCOUNT #-}
+
+#=== SCHEMA =================================
+# deposit_<user address> => INT (amount of asset)
+#============================================
+
+let ASSET = base58'ADjmdGLTMTX5HMJMdPEXSKqjrcGgTE8kCGbz75TP8rwo'
+
+func currentBalance(user: String) = {
+  let balance = this.getInteger("deposit_" + user)
+  match (balance) {
+    case b: Int => b
+    case _ => 0
+  }
+}
+
+@Verifier(tx)
+func verify() = true
+
+@Callable(i)
+func deposit() = {
+  let user = toBase58String(i.caller.bytes)
+  let payment = value(i.payments[0])
+
+  if (payment.amount < 0) then throw("Payment is too low")
+  else if (payment.assetId != ASSET) then throw("AssetId is not correct")
+  else [
+    IntegerEntry("deposit_" + user, currentBalance(user) + payment.amount)
+  ]
+}
+
+@Callable(i)
+func withdraw(amount: Int) = {
+  let user = toBase58String(i.caller.bytes)
+  let balance = currentBalance(user)
+
+  if (balance < amount) then throw("Requested amount is too high")
+  else [
+    IntegerEntry("deposit_" + user, balance - amount),
+    ScriptTransfer(i.caller, amount, ASSET)
+  ]
+}
